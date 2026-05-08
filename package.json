@@ -1,0 +1,134 @@
+{
+  "name": "agentic-coder",
+  "displayName": "Agentic Coder",
+  "description": "Agentic coding platform with free LLMs",
+  "version": "0.0.1",
+  "engines": {
+    "vscode": "^1.118.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onView:agenticCoder.chatView",
+    "onCommand:agentic-coder.openChat",
+    "onCommand:agentic-coder.configureProviders",
+    "onCommand:agentic-coder.applyEdits"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agentic-coder.openChat",
+        "title": "Agentic Coder: Open Chat"
+      },
+      {
+        "command": "agentic-coder.configureProviders",
+        "title": "Agentic Coder: Configure Providers"
+      },
+      {
+        "command": "agentic-coder.applyEdits",
+        "title": "Agentic Coder: Apply Pending Edits"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "agenticCoder",
+          "title": "Agentic Coder"
+        }
+      ]
+    },
+    "views": {
+      "agenticCoder": [
+        {
+          "id": "agenticCoder.chatView",
+          "name": "Chat"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Agentic Coder",
+      "properties": {
+        "agenticCoder.providers.groq.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Groq API key.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.groq.model": {
+          "type": "string",
+          "default": "llama-3.1-8b-instant",
+          "description": "Groq model id.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.together.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Together API key.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.together.model": {
+          "type": "string",
+          "default": "meta-llama/Meta-Llama-3.1-8B-Instruct-Turbo",
+          "description": "Together model id.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.openRouter.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "OpenRouter API key.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.openRouter.model": {
+          "type": "string",
+          "default": "mistralai/mistral-7b-instruct:free",
+          "description": "OpenRouter model id.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.huggingFace.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Hugging Face Inference API key.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.huggingFace.model": {
+          "type": "string",
+          "default": "meta-llama/Meta-Llama-3-8B-Instruct",
+          "description": "Hugging Face model id.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.gemini.apiKey": {
+          "type": "string",
+          "default": "",
+          "description": "Gemini API key.",
+          "scope": "application"
+        },
+        "agenticCoder.providers.gemini.model": {
+          "type": "string",
+          "default": "gemini-1.5-flash",
+          "description": "Gemini model id.",
+          "scope": "application"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "pretest": "npm run compile && npm run lint",
+    "lint": "eslint src",
+    "test": "vscode-test"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.118.0",
+    "@types/mocha": "^10.0.10",
+    "@types/node": "22.x",
+    "typescript-eslint": "^8.56.1",
+    "eslint": "^9.39.3",
+    "typescript": "^5.9.3",
+    "@vscode/test-cli": "^0.0.12",
+    "@vscode/test-electron": "^2.5.2"
+  }
+}
