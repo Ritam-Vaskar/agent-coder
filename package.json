@@ -35,7 +35,8 @@
       "activitybar": [
         {
           "id": "agenticCoder",
-          "title": "Agentic Coder"
+          "title": "Agentic Coder",
+          "icon": "media/icon.svg"
         }
       ]
     },
