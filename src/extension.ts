@@ -7,14 +7,20 @@ type PendingEdit = {
 	content: string;
 };
 
+type TerminalAction = {
+	command: string;
+	cwd?: string;
+};
+
 const MAX_CONTEXT_CHARS = 12000;
 
 const SYSTEM_PROMPT = [
 	'You are an agentic coding assistant. Keep answers concise and actionable.',
 	'Always respond with JSON only (no markdown).',
 	'Use this schema:',
-	'{"message":"short summary","edits":[{"path":"relative/path.ts","content":"full file contents"}]}',
+	'{"message":"short summary","edits":[{"path":"relative/path.ts","content":"full file contents"}],"terminal":{"command":"...","cwd":"optional/relative"}}',
 	'If no edits are needed, return: {"message":"...","edits":[]}.',
+	'If user asks to run a command, fill the terminal.command field.',
 	'Use relative paths from the workspace root.'
 ].join('\n');
 
@@ -22,7 +28,8 @@ const RESPONSE_FORMAT_PROMPT = [
 	'RESPONSE RULES:',
 	'- Output JSON only. Do not wrap in Markdown.',
 	'- Include edits with full file contents when changes are requested.',
-	'- If user asks to modify the active file, return an edit for that file path.'
+	'- If user asks to modify the active file, return an edit for that file path.',
+	'- If user asks to run something, include terminal.command.'
 ].join('\n');
 
 export function activate(context: vscode.ExtensionContext) {
@@ -226,6 +233,9 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 				hasEdits: this.pendingEdits.length > 0,
 				isStructured: parsed.isStructured
 			});
+			if (parsed.terminal) {
+				await this.runTerminalCommand(parsed.terminal);
+			}
 			if (!parsed.isStructured) {
 				this.view?.webview.postMessage({
 					type: 'status',
@@ -280,6 +290,26 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 		}
 	}
 
+	private async runTerminalCommand(action: TerminalAction): Promise<void> {
+		const command = action.command?.trim();
+		if (!command) {
+			return;
+		}
+
+		const workspaceRoot = this.getWorkspaceRoot();
+		let cwd: string | undefined;
+		if (action.cwd && workspaceRoot) {
+			const normalized = normalizePath(action.cwd);
+			if (normalized) {
+				cwd = vscode.Uri.joinPath(workspaceRoot, normalized).fsPath;
+			}
+		}
+
+		const terminal = vscode.window.createTerminal({ name: 'Agentic Coder', cwd });
+		terminal.show(true);
+		terminal.sendText(command);
+	}
+
 	private getWorkspaceRoot(): vscode.Uri | undefined {
 		return vscode.workspace.workspaceFolders?.[0]?.uri;
 	}
@@ -313,6 +343,7 @@ type ParsedResponse = {
 	message?: string;
 	edits: PendingEdit[];
 	isStructured: boolean;
+	terminal?: TerminalAction;
 };
 
 function parseAssistantResponse(text: string): ParsedResponse {
@@ -324,12 +355,27 @@ function parseAssistantResponse(text: string): ParsedResponse {
 	}
 
 	try {
-		const parsed = JSON.parse(rawJson) as { message?: string; edits?: Array<{ path?: string; content?: string }> };
+		const parsed = JSON.parse(rawJson) as {
+			message?: string;
+			edits?: Array<{ path?: string; content?: string }>;
+			terminal?: { command?: string; cwd?: string };
+		};
 		const edits = sanitizeEdits(parsed.edits ?? []);
-		return { message: parsed.message ?? text, edits, isStructured: true };
+		const terminal = sanitizeTerminal(parsed.terminal);
+		return { message: parsed.message ?? text, edits, isStructured: true, terminal };
 	} catch {
 		return { message: text, edits: [], isStructured: false };
 	}
+}
+
+function sanitizeTerminal(terminal?: { command?: string; cwd?: string }): TerminalAction | undefined {
+	if (!terminal?.command || typeof terminal.command !== 'string') {
+		return undefined;
+	}
+	if (terminal.cwd && typeof terminal.cwd !== 'string') {
+		return { command: terminal.command };
+	}
+	return { command: terminal.command, cwd: terminal.cwd };
 }
 
 function sanitizeEdits(edits: Array<{ path?: string; content?: string }>): PendingEdit[] {
