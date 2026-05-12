@@ -103,12 +103,6 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 			case 'openSettings':
 				vscode.commands.executeCommand('workbench.action.openSettings', 'agenticCoder');
 				return;
-			case 'clearChat':
-				this.messages.length = 0;
-				this.messages.push({ role: 'system', content: SYSTEM_PROMPT });
-				this.pendingEdits = [];
-				this.view?.webview.postMessage({ type: 'cleared' });
-				return;
 			case 'sendPrompt':
 				await this.handleSendPrompt(
 					String(message.text ?? ''),
@@ -143,25 +137,12 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 </head>
 <body>
 	<div class="container">
-		<div class="titlebar">
-			<div>
-				<div class="title">Agentic Coder</div>
-				<div class="subtitle">Chat with free LLMs. Preview and apply edits.</div>
-			</div>
-			<div class="status" id="status"></div>
-		</div>
-		<div class="controls">
+		<div class="header">
 			<select id="provider"></select>
-			<span class="pill" id="providerStatus">Not configured</span>
 			<button class="secondary" id="settings">Settings</button>
-			<button class="ghost" id="clear">Clear</button>
+			<span class="status"></span>
 		</div>
-		<div class="messages">
-			<div class="empty" id="emptyState">
-				<div class="empty-title">Start with a goal</div>
-				<div class="empty-subtitle">Ask for edits, refactors, or explanations. Use Preview to review changes.</div>
-			</div>
-		</div>
+		<div class="messages"></div>
 		<div class="composer">
 			<textarea id="prompt" placeholder="Ask for changes or guidance..."></textarea>
 			<div class="row">
