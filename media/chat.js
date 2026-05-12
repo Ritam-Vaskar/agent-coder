@@ -105,7 +105,11 @@ window.addEventListener('message', (event) => {
 			break;
 		case 'chatResponse':
 			addMessage('assistant', message.content, message.hasEdits);
-			setStatus('');
+				if (!message.hasEdits && !message.isStructured) {
+					setStatus('No edits returned. Ask for changes to the active file.');
+				} else {
+					setStatus('');
+				}
 			setBusy(false);
 			break;
 		case 'chatError':

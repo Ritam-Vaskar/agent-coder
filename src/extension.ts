@@ -11,11 +11,18 @@ const MAX_CONTEXT_CHARS = 12000;
 
 const SYSTEM_PROMPT = [
 	'You are an agentic coding assistant. Keep answers concise and actionable.',
-	'If you propose file changes, respond with a JSON block in fenced code:',
-	'```json',
+	'Always respond with JSON only (no markdown).',
+	'Use this schema:',
 	'{"message":"short summary","edits":[{"path":"relative/path.ts","content":"full file contents"}]}',
-	'```',
-	'Use relative paths from the workspace root. If no edits are needed, respond normally.'
+	'If no edits are needed, return: {"message":"...","edits":[]}.',
+	'Use relative paths from the workspace root.'
+].join('\n');
+
+const RESPONSE_FORMAT_PROMPT = [
+	'RESPONSE RULES:',
+	'- Output JSON only. Do not wrap in Markdown.',
+	'- Include edits with full file contents when changes are requested.',
+	'- If user asks to modify the active file, return an edit for that file path.'
 ].join('\n');
 
 export function activate(context: vscode.ExtensionContext) {
@@ -203,6 +210,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 		if (contextMessage) {
 			requestMessages.push({ role: 'system', content: contextMessage });
 		}
+		requestMessages.push({ role: 'system', content: RESPONSE_FORMAT_PROMPT });
 		requestMessages.push({ role: 'user', content: text });
 
 		try {
@@ -215,8 +223,15 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 			this.view?.webview.postMessage({
 				type: 'chatResponse',
 				content: assistantMessage,
-				hasEdits: this.pendingEdits.length > 0
+				hasEdits: this.pendingEdits.length > 0,
+				isStructured: parsed.isStructured
 			});
+			if (!parsed.isStructured) {
+				this.view?.webview.postMessage({
+					type: 'status',
+					text: 'No edits returned. Ask for changes to the active file.'
+				});
+			}
 			this.postProviders();
 		} catch (error) {
 			this.postError(error instanceof Error ? error.message : 'Provider request failed.');
@@ -297,6 +312,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 type ParsedResponse = {
 	message?: string;
 	edits: PendingEdit[];
+	isStructured: boolean;
 };
 
 function parseAssistantResponse(text: string): ParsedResponse {
@@ -304,15 +320,15 @@ function parseAssistantResponse(text: string): ParsedResponse {
 	const rawJson = jsonBlock ? jsonBlock[1] : text.trim().startsWith('{') ? text : '';
 
 	if (!rawJson) {
-		return { message: text, edits: [] };
+		return { message: text, edits: [], isStructured: false };
 	}
 
 	try {
 		const parsed = JSON.parse(rawJson) as { message?: string; edits?: Array<{ path?: string; content?: string }> };
 		const edits = sanitizeEdits(parsed.edits ?? []);
-		return { message: parsed.message ?? text, edits };
+		return { message: parsed.message ?? text, edits, isStructured: true };
 	} catch {
-		return { message: text, edits: [] };
+		return { message: text, edits: [], isStructured: false };
 	}
 }
 
