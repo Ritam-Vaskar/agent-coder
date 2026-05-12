@@ -2,7 +2,8 @@ const vscode = acquireVsCodeApi();
 
 const state = {
 	providerId: '',
-	isBusy: false
+	isBusy: false,
+	providers: []
 };
 
 const messagesEl = document.querySelector('.messages');
@@ -12,9 +13,20 @@ const promptEl = document.querySelector('#prompt');
 const sendButton = document.querySelector('#send');
 const settingsButton = document.querySelector('#settings');
 const includeActiveEl = document.querySelector('#includeActive');
+const clearButton = document.querySelector('#clear');
+const emptyStateEl = document.querySelector('#emptyState');
+const providerStatusEl = document.querySelector('#providerStatus');
 
 function setStatus(text) {
 	statusEl.textContent = text || '';
+}
+
+function updateEmptyState() {
+	if (!emptyStateEl) {
+		return;
+	}
+	const hasMessages = messagesEl.querySelectorAll('.message').length > 0;
+	emptyStateEl.style.display = hasMessages ? 'none' : 'block';
 }
 
 function setBusy(isBusy) {
@@ -22,6 +34,10 @@ function setBusy(isBusy) {
 	sendButton.disabled = isBusy;
 	promptEl.disabled = isBusy;
 	providerSelect.disabled = isBusy;
+	settingsButton.disabled = isBusy;
+	if (clearButton) {
+		clearButton.disabled = isBusy;
+	}
 }
 
 function addMessage(role, content, hasEdits) {
@@ -53,9 +69,11 @@ function addMessage(role, content, hasEdits) {
 
 	messagesEl.appendChild(message);
 	messagesEl.scrollTop = messagesEl.scrollHeight;
+	updateEmptyState();
 }
 
 function updateProviders(providers) {
+	state.providers = providers || [];
 	providerSelect.innerHTML = '';
 	providers.forEach((provider) => {
 		const option = document.createElement('option');
@@ -68,10 +86,27 @@ function updateProviders(providers) {
 		state.providerId = providers[0].id;
 		providerSelect.value = state.providerId;
 	}
+
+	const selected = state.providers.find((provider) => provider.id === providerSelect.value);
+	if (providerStatusEl) {
+		providerStatusEl.textContent = selected?.configured ? 'Ready' : 'Needs key';
+	}
 }
 
 providerSelect.addEventListener('change', () => {
 	state.providerId = providerSelect.value;
+	const selected = state.providers.find((provider) => provider.id === providerSelect.value);
+	if (providerStatusEl) {
+		providerStatusEl.textContent = selected?.configured ? 'Ready' : 'Needs key';
+	}
+});
+
+if (clearButton) {
+	clearButton.addEventListener('click', () => {
+		messagesEl.querySelectorAll('.message').forEach((node) => node.remove());
+		updateEmptyState();
+		vscode.postMessage({ type: 'clearChat' });
+	});
 });
 
 sendButton.addEventListener('click', () => {
@@ -96,6 +131,12 @@ settingsButton.addEventListener('click', () => {
 	vscode.postMessage({ type: 'openSettings' });
 });
 
+promptEl.addEventListener('keydown', (event) => {
+	if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+		sendButton.click();
+	}
+});
+
 window.addEventListener('message', (event) => {
 	const message = event.data;
 
@@ -116,9 +157,14 @@ window.addEventListener('message', (event) => {
 		case 'status':
 			setStatus(message.text || '');
 			break;
+		case 'cleared':
+			messagesEl.querySelectorAll('.message').forEach((node) => node.remove());
+			updateEmptyState();
+			break;
 		default:
 			break;
 	}
 });
 
 vscode.postMessage({ type: 'ready' });
+updateEmptyState();
