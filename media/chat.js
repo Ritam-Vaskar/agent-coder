@@ -11,6 +11,7 @@ const statusEl = document.querySelector('.status');
 const promptEl = document.querySelector('#prompt');
 const sendButton = document.querySelector('#send');
 const settingsButton = document.querySelector('#settings');
+const includeActiveEl = document.querySelector('#includeActive');
 
 function setStatus(text) {
 	statusEl.textContent = text || '';
@@ -83,7 +84,12 @@ sendButton.addEventListener('click', () => {
 	promptEl.value = '';
 	setStatus('Sending...');
 	setBusy(true);
-	vscode.postMessage({ type: 'sendPrompt', text, providerId: state.providerId });
+	vscode.postMessage({
+		type: 'sendPrompt',
+		text,
+		providerId: state.providerId,
+		includeActiveFile: includeActiveEl ? includeActiveEl.checked : true
+	});
 });
 
 settingsButton.addEventListener('click', () => {

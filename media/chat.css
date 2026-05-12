@@ -90,6 +90,14 @@ body {
 	margin-top: 8px;
 }
 
+.toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 6px;
+	font-size: 11px;
+	opacity: 0.8;
+}
+
 button.primary {
 	background: var(--accent);
 	color: var(--accent-fg);

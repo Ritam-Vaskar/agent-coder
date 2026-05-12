@@ -7,6 +7,8 @@ type PendingEdit = {
 	content: string;
 };
 
+const MAX_CONTEXT_CHARS = 12000;
+
 const SYSTEM_PROMPT = [
 	'You are an agentic coding assistant. Keep answers concise and actionable.',
 	'If you propose file changes, respond with a JSON block in fenced code:',
@@ -102,7 +104,11 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 				vscode.commands.executeCommand('workbench.action.openSettings', 'agenticCoder');
 				return;
 			case 'sendPrompt':
-				await this.handleSendPrompt(String(message.text ?? ''), String(message.providerId ?? ''));
+				await this.handleSendPrompt(
+					String(message.text ?? ''),
+					String(message.providerId ?? ''),
+					Boolean(message.includeActiveFile)
+				);
 				return;
 			case 'previewEdits':
 				await this.previewPendingEdits();
@@ -140,7 +146,10 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 		<div class="composer">
 			<textarea id="prompt" placeholder="Ask for changes or guidance..."></textarea>
 			<div class="row">
-				<span></span>
+				<label class="toggle">
+					<input type="checkbox" id="includeActive" checked />
+					<span>Include active file</span>
+				</label>
 				<button class="primary" id="send">Send</button>
 			</div>
 		</div>
@@ -170,7 +179,7 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 		};
 	}
 
-	private async handleSendPrompt(text: string, providerId: string): Promise<void> {
+	private async handleSendPrompt(text: string, providerId: string, includeActiveFile: boolean): Promise<void> {
 		if (!text.trim()) {
 			return;
 		}
@@ -188,12 +197,19 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 		}
 
 		this.view?.webview.postMessage({ type: 'status', text: 'Thinking...' });
-		this.messages.push({ role: 'user', content: text });
+
+		const contextMessage = includeActiveFile ? this.getActiveFileContext() : undefined;
+		const requestMessages = [...this.messages];
+		if (contextMessage) {
+			requestMessages.push({ role: 'system', content: contextMessage });
+		}
+		requestMessages.push({ role: 'user', content: text });
 
 		try {
-			const rawResponse = await provider.sendChat(this.messages, settings);
+			const rawResponse = await provider.sendChat(requestMessages, settings);
 			const parsed = parseAssistantResponse(rawResponse);
 			const assistantMessage = parsed.message ?? rawResponse;
+			this.messages.push({ role: 'user', content: text });
 			this.messages.push({ role: 'assistant', content: assistantMessage });
 			this.pendingEdits = parsed.edits;
 			this.view?.webview.postMessage({
@@ -252,6 +268,30 @@ class ChatViewProvider implements vscode.WebviewViewProvider {
 	private getWorkspaceRoot(): vscode.Uri | undefined {
 		return vscode.workspace.workspaceFolders?.[0]?.uri;
 	}
+
+	private getActiveFileContext(): string | undefined {
+		const editor = vscode.window.activeTextEditor;
+		if (!editor) {
+			return undefined;
+		}
+
+		const document = editor.document;
+		const workspaceRoot = this.getWorkspaceRoot();
+		const relativePath = workspaceRoot
+			? vscode.workspace.asRelativePath(document.uri, false)
+			: document.uri.fsPath;
+
+		const fullText = document.getText();
+		const selectedText = editor.selection.isEmpty ? '' : document.getText(editor.selection);
+		const excerpt = trimContext(fullText, MAX_CONTEXT_CHARS);
+
+		return [
+			'Active file context:',
+			`Path: ${relativePath}`,
+			selectedText ? `Selection:\n${selectedText}` : 'Selection: (none)',
+			`Content:\n${excerpt}`
+		].join('\n');
+	}
 }
 
 type ParsedResponse = {
@@ -305,4 +345,13 @@ function getNonce(): string {
 		text += possible.charAt(Math.floor(Math.random() * possible.length));
 	}
 	return text;
+}
+
+function trimContext(content: string, maxChars: number): string {
+	if (content.length <= maxChars) {
+		return content;
+	}
+	const headSize = Math.floor(maxChars * 0.6);
+	const tailSize = maxChars - headSize;
+	return `${content.slice(0, headSize)}\n...truncated...\n${content.slice(-tailSize)}`;
 }

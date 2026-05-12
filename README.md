@@ -5,6 +5,7 @@ Agentic Coder is a VS Code extension that provides a Cursor-like chat sidebar ba
 ## Features
 
 - Sidebar chat view with provider selector.
+- Optionally include the active file content as context.
 - Free-tier providers: Groq, Together, OpenRouter, Hugging Face Inference, Gemini.
 - File edits previewed in a diff and applied on demand.
 
